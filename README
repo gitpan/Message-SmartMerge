@@ -1,0 +1,237 @@
+Message-SmartMerge
+
+    use Message::SmartMerge;
+
+    my $merge = Message::SmartMerge->new();
+    $merge->config({
+        merge_instance => 'instance',
+    });
+
+    $merge->message({
+        instance => 'i1',
+        x => 'y',
+        this => 'whatever',
+    });
+    #no merges, so pass through:
+    #emit sends { instance => 'i1', x => 'y', this => 'whatever' }
+    
+    $merge->add_merge({
+        merge_id => 'm1',
+        match => {x => 'y'},
+        transform => {this => 'that'},
+    });
+    #so we've already passed through a message instance i1, and this new
+    #merge matches that, so the module will send a transformed message:
+        {   instance => 'i1',
+            x => 'y',
+            this => 'that',
+        }
+
+    #Now send another message through:
+    $merge->message({
+        instance => 'i1',
+        x => 'y',
+        this => 'not that',
+        something => 'else',
+    });
+    #merge matches x => 'y', so transforms this => 'that':
+    #emit sends:
+        {   instance => 'i1',
+            x => 'y',
+            this => 'that',
+            something => 'else'
+        }
+
+    $merge->remove_merge('m1');
+    #even though we didn't send a message in, removing a merge will trigger
+    #an emit to reflect that a change has occurred, specifically that the
+    #previously activated transform is no longer in force.  It sends the
+    #last message received, without the transform
+    #emit sends:
+        {   instance => 'i1',
+            x => 'y',
+            this => 'not that',
+            something => 'else'
+        }
+
+    #Here's a way the message stream can clear a merge:
+    $merge->add_merge({
+        merge_id => 'm2',
+        match => {
+            x => 'y',
+        },
+        transform => {
+            foo => 'bar',
+        },
+        toggle_fields => ['something'],
+    });
+
+    #Since m2 also matches x => 'y', we emit:
+        {   instance => 'i1',
+            x => 'y',
+            this => 'not that',
+            something => 'else',
+            foo => 'bar',
+        }
+
+    $merge->message({
+        instance => 'i1',
+        x => 'y',
+        foo => 'not bar',
+        something => 'else',
+        another => 'thing',
+    });
+    #the value of the single defined toggle field ('something') did not
+    #change from the first value we saw in it ('else').  So m2 stands:
+        {   instance => 'i1',
+            x => 'y',
+            something => 'else',
+            foo => 'bar',
+            another => 'thing',
+        }
+    #even though we passed 'not bar' in with foo, it was transformed to 'bar'
+
+    #Now let's hit the toggle:
+    $merge->message({
+        instance => 'i1',
+        x => 'y',
+        foo => 'not bar',
+        something => 'other',
+        another => 'thing',
+    });
+    #this will 'permanently' remove the merge m2 for i1; the message passes
+    #through untransformed:
+        {   instance => 'i1',
+            x => 'y',
+            foo => 'not bar',
+            something => 'other',
+            another => 'thing',
+        }
+
+    #Here's another way the message stream can clear a merge:
+    $merge->add_merge({
+        merge_id => 'm3',
+        match => {
+            i => 'j',
+        },
+        transform => {
+            a => 'b',
+        },
+        remove_match => {
+            remove => 'match',
+        },
+    });
+    #This causes nothing to emit, because there are no instances that match
+    #i => 'j'
+
+    $merge->message({
+        instance => 'i2',
+        x => 'y',
+        i => 'j',
+        foo => 'not bar',
+        a => 'not b',
+        something => 'here',
+    });
+    #this is fun because it matches both m2 and m3.  it would have matched
+    #m1 had we not removed it
+    #i2 has never been seen before, and m2 is a toggle.  The toggle
+    #deallocates itself for an instance if the toggle field changes
+    #from the previous to the current message.  Since there was no
+    #previous message for i2, the toggle merge deallocates itself for i2
+    #before it can take any action.
+        {   instance => 'i2',
+            x => 'y',
+            i => 'j',
+            foo => 'not bar',
+            something => 'here',
+            a => 'b', #rather than 'not b'
+        }
+
+    #and now to deallocate m3:
+    $merge->message({
+        instance => 'i2',
+        x => 'y',
+        i => 'j',
+        a => 'not b',
+        remove => 'match',
+    });
+    #which emits:
+        {   instance => 'i2',
+            x => 'y',
+            i => 'j',
+            a => 'not b', #no longer transformed
+            remove => 'match',
+        }
+
+
+INSTALLATION
+
+To install this module, run the following commands:
+
+	perl Makefile.PL
+	make
+	make test
+	make install
+
+SUPPORT AND DOCUMENTATION
+
+After installing, you can find documentation for this module with the
+perldoc command.
+
+    perldoc Message::SmartMerge
+
+You can also look for information at:
+
+    Report bugs and feature requests here
+        https://github.com/dana/perl-Message-SmartMerge/issues
+
+    AnnoCPAN, Annotated CPAN documentation
+        http://annocpan.org/dist/Message-SmartMerge
+
+    CPAN Ratings
+        http://cpanratings.perl.org/d/Message-SmartMerge
+
+    Search CPAN
+        https://metacpan.org/module/Message::SmartMerge
+
+
+LICENSE AND COPYRIGHT
+
+Copyright (C) 2013 Dana M. Diederich
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of the the Artistic License (2.0). You may obtain a
+copy of the full license at:
+
+L<http://www.perlfoundation.org/artistic_license_2_0>
+
+Any use, modification, and distribution of the Standard or Modified
+Versions is governed by this Artistic License. By using, modifying or
+distributing the Package, you accept this license. Do not use, modify,
+or distribute the Package, if you do not accept this license.
+
+If your Modified Version has been derived from a Modified Version made
+by someone other than you, you are nevertheless required to ensure that
+your Modified Version complies with the requirements of this license.
+
+This license does not grant you the right to use any trademark, service
+mark, tradename, or logo of the Copyright Holder.
+
+This license includes the non-exclusive, worldwide, free-of-charge
+patent license to make, have made, use, offer to sell, sell, import and
+otherwise transfer the Package with respect to any patent claims
+licensable by the Copyright Holder that are necessarily infringed by the
+Package. If you institute patent litigation (including a cross-claim or
+counterclaim) against any party alleging that the Package constitutes
+direct or contributory patent infringement, then this Artistic License
+to you shall terminate on the date that such litigation is filed.
+
+Disclaimer of Warranty: THE PACKAGE IS PROVIDED BY THE COPYRIGHT HOLDER
+AND CONTRIBUTORS "AS IS' AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES.
+THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE, OR NON-INFRINGEMENT ARE DISCLAIMED TO THE EXTENT PERMITTED BY
+YOUR LOCAL LAW. UNLESS REQUIRED BY LAW, NO COPYRIGHT HOLDER OR
+CONTRIBUTOR WILL BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, OR
+CONSEQUENTIAL DAMAGES ARISING IN ANY WAY OUT OF THE USE OF THE PACKAGE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
