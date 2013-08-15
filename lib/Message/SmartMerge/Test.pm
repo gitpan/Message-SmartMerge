@@ -1,4 +1,7 @@
 package Message::SmartMerge::Test;
+{
+  $Message::SmartMerge::Test::VERSION = '1.132270';
+}
 
 use strict;use warnings;
 use Message::Match qw(mmatch);

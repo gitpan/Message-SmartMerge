@@ -10,4 +10,3 @@ BEGIN {
     use_ok( 'Message::SmartMerge' ) || print "Bail out!\n";
 }
 
-diag( "Testing Message::SmartMerge $Message::SmartMerge::VERSION, Perl $], $^X" );
